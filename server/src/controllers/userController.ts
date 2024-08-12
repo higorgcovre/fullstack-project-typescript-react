@@ -18,6 +18,7 @@ export const createUser = async (req: Request, res: Response) => {
 };
 
 // Ler usuários
+// Em userController.ts
 export const getUsers = async (req: Request, res: Response) => {
   try {
     const userRepository = AppDataSource.getRepository(User);
@@ -27,6 +28,7 @@ export const getUsers = async (req: Request, res: Response) => {
     res.status(500).json({ message: 'Erro ao buscar usuários', error });
   }
 };
+
 
 // Atualizar usuário
 export const updateUser = async (req: Request, res: Response) => {
