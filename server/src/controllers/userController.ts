@@ -7,7 +7,7 @@ import nodemailer from 'nodemailer';
 
 // Configurar o transportador de e-mail
 const transporter = nodemailer.createTransport({
-  service: 'gmail', // ou outro serviço de e-mail
+  service: 'gmail', 
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
@@ -50,19 +50,12 @@ export const createUser = async (req: Request, res: Response) => {
     const user = userRepository.create({ name, email, password: hashedPassword });
     await userRepository.save(user);
 
-    // Gerar e enviar token de validação
-    const token = jwt.sign({ email }, process.env.JWT_SECRET!, { expiresIn: '1h' });
-    await transporter.sendMail({
-      to: email,
-      subject: 'Confirmação de Email',
-      text: `Seu token de confirmação é: ${token}`,
-    });
-
-    res.status(201).json({ message: 'Usuário criado com sucesso. Verifique seu e-mail para o token de confirmação.' });
+    res.status(201).json({ message: 'Usuário criado com sucesso.' });
   } catch (error) {
     res.status(500).json({ message: 'Erro ao criar usuário', error });
   }
 };
+
 
 // Verificar token
 export const verifyToken = async (req: Request, res: Response) => {
@@ -124,21 +117,23 @@ export const deleteUser = async (req: Request, res: Response) => {
   }
 };
 
-export const getUserByEmail = async (req: Request, res: Response) => {
-  const { email } = req.query;
-
-  if (!email || typeof email !== 'string') {
-    return res.status(400).json({ message: 'Email é necessário' });
-  }
-
+export const getUserById = async (req: Request, res: Response) => {
+  const { id } = req.params;
   try {
+    // Busca o repositório do TypeORM
     const userRepository = AppDataSource.getRepository(User);
-    const user = await userRepository.findOneBy({ email });
+
+    // Encontre o usuário pelo id
+    const user = await userRepository.findOneBy({ id: parseInt(id) });
+
     if (!user) {
       return res.status(404).json({ message: 'Usuário não encontrado' });
     }
+
     res.json(user);
   } catch (error) {
-    res.status(500).json({ message: 'Erro ao buscar usuário', error });
+    console.error(error);
+    res.status(500).json({ message: 'Erro interno do servidor' });
   }
 };
+

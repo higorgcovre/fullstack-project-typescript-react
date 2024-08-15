@@ -1,4 +1,5 @@
 import { DataSource } from "typeorm";
+import { User } from "../models/User"; 
 import "reflect-metadata";
 
 export const AppDataSource = new DataSource({
@@ -11,12 +12,20 @@ export const AppDataSource = new DataSource({
   synchronize: true,
   logging: false,
   entities: [
-    "src/models/**/*.ts"
+    User, 
   ],
   migrations: [
-    "src/migration/**/*.ts"
+    "src/migration/**/*.ts",
   ],
   subscribers: [
-    "src/subscriber/**/*.ts"
+    "src/subscriber/**/*.ts",
   ],
 });
+
+AppDataSource.initialize()
+  .then(() => {
+    console.log('Data Source has been initialized!');
+  })
+  .catch((err) => {
+    console.error('Error during Data Source initialization:', err);
+  });
