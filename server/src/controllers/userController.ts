@@ -2,6 +2,44 @@ import { Request, Response } from 'express';
 import { AppDataSource } from '../config/data-source';
 import { User } from '../models/User';
 import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
+import nodemailer from 'nodemailer';
+
+// Configurar o transportador de e-mail
+const transporter = nodemailer.createTransport({
+  service: 'gmail', // ou outro serviço de e-mail
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
+
+export const loginUser = async (req: Request, res: Response) => {
+  const { email, password } = req.body;
+
+  try {
+    const userRepository = AppDataSource.getRepository(User);
+    const user = await userRepository.findOneBy({ email });
+
+    if (!user) {
+      return res.status(404).json({ message: 'Usuário não encontrado' });
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: 'Senha incorreta' });
+    }
+
+    // Se tudo estiver certo, gerar um token JWT
+    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET!, {
+      expiresIn: '1h',
+    });
+
+    res.json({ token });
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao fazer login', error });
+  }
+};
 
 // Criar usuário
 export const createUser = async (req: Request, res: Response) => {
@@ -11,14 +49,33 @@ export const createUser = async (req: Request, res: Response) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = userRepository.create({ name, email, password: hashedPassword });
     await userRepository.save(user);
-    res.status(201).json(user);
+
+    // Gerar e enviar token de validação
+    const token = jwt.sign({ email }, process.env.JWT_SECRET!, { expiresIn: '1h' });
+    await transporter.sendMail({
+      to: email,
+      subject: 'Confirmação de Email',
+      text: `Seu token de confirmação é: ${token}`,
+    });
+
+    res.status(201).json({ message: 'Usuário criado com sucesso. Verifique seu e-mail para o token de confirmação.' });
   } catch (error) {
     res.status(500).json({ message: 'Erro ao criar usuário', error });
   }
 };
 
+// Verificar token
+export const verifyToken = async (req: Request, res: Response) => {
+  const { token } = req.body;
+  try {
+    jwt.verify(token, process.env.JWT_SECRET!);
+    res.json({ message: 'Token válido' });
+  } catch (error) {
+    res.status(400).json({ message: 'Token inválido' });
+  }
+};
+
 // Ler usuários
-// Em userController.ts
 export const getUsers = async (req: Request, res: Response) => {
   try {
     const userRepository = AppDataSource.getRepository(User);
@@ -28,7 +85,6 @@ export const getUsers = async (req: Request, res: Response) => {
     res.status(500).json({ message: 'Erro ao buscar usuários', error });
   }
 };
-
 
 // Atualizar usuário
 export const updateUser = async (req: Request, res: Response) => {
@@ -65,5 +121,24 @@ export const deleteUser = async (req: Request, res: Response) => {
     res.json({ message: 'Usuário deletado com sucesso' });
   } catch (error) {
     res.status(500).json({ message: 'Erro ao deletar usuário', error });
+  }
+};
+
+export const getUserByEmail = async (req: Request, res: Response) => {
+  const { email } = req.query;
+
+  if (!email || typeof email !== 'string') {
+    return res.status(400).json({ message: 'Email é necessário' });
+  }
+
+  try {
+    const userRepository = AppDataSource.getRepository(User);
+    const user = await userRepository.findOneBy({ email });
+    if (!user) {
+      return res.status(404).json({ message: 'Usuário não encontrado' });
+    }
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao buscar usuário', error });
   }
 };
